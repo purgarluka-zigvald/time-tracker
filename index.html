@@ -232,15 +232,16 @@
       <div class="table-wrapper">
         <table>
           <thead>
-            <tr>
-              <th>Naročnik</th>
-              <th>Projekt</th>
-              <th>Datum</th>
-              <th>Začetek</th>
-              <th>Konec</th>
-              <th>Seštevek</th>
-            </tr>
-          </thead>
+  <tr>
+    <th>Naročnik</th>
+    <th>Projekt</th>
+    <th>Datum</th>
+    <th>Začetek</th>
+    <th>Konec</th>
+    <th>Realni čas</th>
+    <th>Seštevek</th>
+  </tr>
+</thead>
           <tbody id="entriesTableBody">
             <!-- Dinamični vnosi -->
           </tbody>
@@ -337,58 +338,66 @@
   }
 
   async function closeEntry(projectId, startTime, endTime) {
-    const project = projects.find((p) => p.id === projectId);
-    if (!project) return;
+  const project = projects.find((p) => p.id === projectId);
+  if (!project) return;
 
-    const diffMs = endTime - startTime;
-    const diffMinutes = diffMs / 60000;
+  const diffMs = endTime - startTime;
+  const diffMinutes = diffMs / 60000;
 
-    // Zaokroževanje na najbližjih 15 minut
-    const roundedMinutes = Math.round(diffMinutes / 15) * 15;
-    const hours = Math.floor(roundedMinutes / 60);
-    const minutes = roundedMinutes % 60;
-    const totalFormatted = `${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}`;
+  // REALNI ČAS (za evidenco)
+  const realHours = Math.floor(diffMinutes / 60);
+  const realMinutes = Math.floor(diffMinutes % 60);
+  const realFormatted = `${String(realHours).padStart(2,"0")}:${String(realMinutes).padStart(2,"0")}`;
 
-    const dateStr = formatDateYMD(startTime);
-    const startStr = formatTimeHM(startTime);
-    const endStr = formatTimeHM(endTime);
+  // ZAOKROŽEN ČAS – vedno NAVZGOR na 15 minut (za billing)
+  const roundedMinutes = Math.ceil(diffMinutes / 15) * 15;
+  const billHours = Math.floor(roundedMinutes / 60);
+  const billMinutes = roundedMinutes % 60;
+  const totalFormatted = `${String(billHours).padStart(2,"0")}:${String(billMinutes).padStart(2,"0")}`;
 
-    const entry = {
-      client: project.client,
-      project: project.name,
-      date: dateStr,
-      start: startStr,
-      end: endStr,
-      total: totalFormatted,
-    };
+  const dateStr = formatDateYMD(startTime);
+  const startStr = formatTimeHM(startTime);
+  const endStr = formatTimeHM(endTime);
 
-    // Dodaj v lokalno tabelo (da takoj vidiš v UI)
-    entries.push(entry);
-    renderEntries();
+  const entry = {
+    client: project.client,
+    project: project.name,
+    date: dateStr,
+    start: startStr,
+    end: endStr,
+    real: realFormatted,   // NOVO
+    total: totalFormatted,
+  };
 
-    // Pošlji v Google Sheet (ne blokira UI, samo logira napako v konzolo, če kaj crkne)
-    if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.startsWith("http")) {
-      try {
-        const formData = new URLSearchParams();
-        formData.append("client", entry.client);
-        formData.append("project", entry.project);
-        formData.append("date", entry.date);
-        formData.append("start", entry.start);
-        formData.append("end", entry.end);
-        formData.append("total", entry.total);
+  // lokalno v appu
+  entries.push(entry);
+  renderEntries();
 
-        await fetch(GOOGLE_SCRIPT_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-          },
-          body: formData.toString(),
-        });
-      } catch (err) {
-        console.error("Napaka pri pošiljanju v Google Sheet:", err);
-      }
+  // pošlji v Google Sheet
+  if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.startsWith("http")) {
+    try {
+      const formData = new URLSearchParams();
+      formData.append("client", entry.client);
+      formData.append("project", entry.project);
+      formData.append("date", entry.date);
+      formData.append("start", entry.start);
+      formData.append("end", entry.end);
+      formData.append("real", entry.real);    // NOVO
+      formData.append("total", entry.total);
+
+      await fetch(GOOGLE_SCRIPT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        },
+        body: formData.toString(),
+      });
+    } catch (err) {
+      console.error("Napaka pri pošiljanju v Google Sheet:", err);
     }
   }
+}
+
 
   function formatDateYMD(date) {
     const y = date.getFullYear();
@@ -404,23 +413,25 @@
   }
 
   function renderEntries() {
-    entriesTableBody.innerHTML = "";
-    entries.forEach((e) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${e.client}</td>
-        <td>${e.project}</td>
-        <td>${e.date}</td>
-        <td>${e.start}</td>
-        <td>${e.end}</td>
-        <td>${e.total}</td>
-      `;
-      entriesTableBody.appendChild(tr);
-    });
+  entriesTableBody.innerHTML = "";
+  entries.forEach((e) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${e.client}</td>
+      <td>${e.project}</td>
+      <td>${e.date}</td>
+      <td>${e.start}</td>
+      <td>${e.end}</td>
+      <td>${e.real}</td>
+      <td>${e.total}</td>
+    `;
+    entriesTableBody.appendChild(tr);
+  });
 
-    entriesCountBadge.textContent = `${entries.length} vnosov`;
-    downloadCsvBtn.disabled = entries.length === 0;
-  }
+  entriesCountBadge.textContent = `${entries.length} vnosov`;
+  downloadCsvBtn.disabled = entries.length === 0;
+}
+
 
   // Timer prikaz
   function startTimerInterval() {
@@ -467,33 +478,35 @@
 
   // Export v CSV (Excel-friendly)
   downloadCsvBtn.addEventListener("click", () => {
-    if (entries.length === 0) return;
+  if (entries.length === 0) return;
 
-    const header = ["Naročnik", "Projekt", "Datum", "Začetek", "Konec", "Seštevek"];
-    let csv = header.join(";") + "\n";
+  const header = ["Naročnik", "Projekt", "Datum", "Začetek", "Konec", "Realni čas", "Seštevek"];
+  let csv = header.join(";") + "\n";
 
-    entries.forEach((e) => {
-      const row = [
-        e.client,
-        e.project,
-        e.date,
-        e.start,
-        e.end,
-        e.total,
-      ].map((v) => `"${v.replace(/"/g, '""')}"`);
-      csv += row.join(";") + "\n";
-    });
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "time-tracking.csv";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  entries.forEach((e) => {
+    const row = [
+      e.client,
+      e.project,
+      e.date,
+      e.start,
+      e.end,
+      e.real,   // NOVO
+      e.total,
+    ].map((v) => `"${v.replace(/"/g, '""')}"`);
+    csv += row.join(";") + "\n";
   });
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "time-tracking.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
 
   // začetno stanje
   renderProjects();

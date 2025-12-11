@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Time tracker za projekte</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f7;
+      color: #1f1f1f;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 24px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 20px;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #d0d0d5;
+      font-size: 14px;
+      box-sizing: border-box;
+      margin-bottom: 8px;
+    }
+
+    button {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: none;
+      font-size: 14px;
+      cursor: pointer;
+      background: #111827;
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button.secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .projects-list {
+      margin-top: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .project-item {
+      display: flex;
+      flex-direction: column;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      margin-bottom: 6px;
+      cursor: pointer;
+      background: #fafafa;
+      font-size: 13px;
+    }
+
+    .project-item:hover {
+      background: #f3f4f6;
+    }
+
+    .project-item.active {
+      border-color: #111827;
+      background: #e5e7eb;
+    }
+
+    .project-client {
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .project-name {
+      font-size: 12px;
+      color: #4b5563;
+    }
+
+    .running-indicator {
+      font-size: 11px;
+      color: #16a34a;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .running-timer {
+      font-size: 13px;
+      margin-left: 6px;
+      color: #111827;
+      font-variant-numeric: tabular-nums;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead {
+      background: #f3f4f6;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    th, td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th {
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: #6b7280;
+    }
+
+    .table-wrapper {
+      max-height: 430px;
+      overflow-y: auto;
+      margin-top: 10px;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      font-size: 11px;
+      background: #e5e7eb;
+      padding: 2px 8px;
+      border-radius: 999px;
+      color: #4b5563;
+    }
+
+    .current-running {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .current-running span.label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #6b7280;
+      letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 800px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Time tracker za projekte</h1>
+
+  <div class="layout">
+    <!-- Leva stran: dodajanje projektov + seznam -->
+    <div class="card">
+      <h2 style="font-size: 18px; margin-top: 0;">Projekti</h2>
+      <p style="font-size: 13px; color:#4b5563; margin-bottom: 8px;">
+        Dodaj naročnika in projekt, nato klikni na projekt za začetek / konec merjenja časa.
+      </p>
+
+      <div>
+        <label for="clientInput">Naročnik</label>
+        <input type="text" id="clientInput" placeholder="npr. Xiris d.o.o." />
+
+        <label for="projectInput">Projekt</label>
+        <input type="text" id="projectInput" placeholder="npr. Redesign spletne strani" />
+
+        <button id="addProjectBtn">Dodaj projekt</button>
+      </div>
+
+      <div class="projects-list" id="projectsList"></div>
+    </div>
+
+    <!-- Desna stran: trenutni timer + log + export -->
+    <div class="card">
+      <div class="top-bar">
+        <div class="current-running" id="currentRunningInfo">
+          <span class="label">Trenutni timer</span>
+          <span>-</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="badge" id="entriesCountBadge">0 vnosov</span>
+          <button class="secondary" id="downloadCsvBtn" disabled>Prenesi CSV za Excel</button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Naročnik</th>
+              <th>Projekt</th>
+              <th>Datum</th>
+              <th>Začetek</th>
+              <th>Konec</th>
+              <th>Seštevek</th>
+            </tr>
+          </thead>
+          <tbody id="entriesTableBody">
+            <!-- Dinamični vnosi -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // ⬇⬇⬇ TUKAJ PRILEPI URL TVOJEGA APPS SCRIPT WEB APP-A ⬇⬇⬇
+  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxdzx62IaYx5zjOUXwHPJDO3wp47VmW37drf9czQf1c_yd_Y3WMLbTJ31z9sUu0SPO9kg/exec";
+
+  // Seznam projektov in vnosov
+  const projects = [];
+  const entries = [];
+
+  let currentTimer = null; // { projectId, startTime: Date }
+  let timerInterval = null;
+
+  const clientInput = document.getElementById("clientInput");
+  const projectInput = document.getElementById("projectInput");
+  const addProjectBtn = document.getElementById("addProjectBtn");
+  const projectsList = document.getElementById("projectsList");
+  const entriesTableBody = document.getElementById("entriesTableBody");
+  const entriesCountBadge = document.getElementById("entriesCountBadge");
+  const downloadCsvBtn = document.getElementById("downloadCsvBtn");
+  const currentRunningInfo = document.getElementById("currentRunningInfo");
+
+  addProjectBtn.addEventListener("click", () => {
+    const client = clientInput.value.trim();
+    const projectName = projectInput.value.trim();
+    if (!client || !projectName) return;
+
+    const id = Date.now().toString() + Math.random().toString(16).slice(2);
+    projects.push({ id, client, name: projectName });
+    clientInput.value = "";
+    projectInput.value = "";
+    renderProjects();
+  });
+
+  function renderProjects() {
+    projectsList.innerHTML = "";
+    if (projects.length === 0) {
+      projectsList.innerHTML = "<p style='font-size:13px; color:#6b7280;'>Ni še projektov. Dodaj prvega zgoraj.</p>";
+      return;
+    }
+
+    projects.forEach((p) => {
+      const div = document.createElement("div");
+      div.className = "project-item";
+      if (currentTimer && currentTimer.projectId === p.id) {
+        div.classList.add("active");
+      }
+
+      div.innerHTML = `
+        <div class="project-client">${p.client}</div>
+        <div class="project-name">${p.name}</div>
+        ${
+          currentTimer && currentTimer.projectId === p.id
+            ? `<div class="running-indicator">⏱ Timer teče <span class="running-timer" data-project-id="${p.id}"></span></div>`
+            : ""
+        }
+      `;
+
+      div.addEventListener("click", () => handleProjectClick(p.id));
+      projectsList.appendChild(div);
+    });
+
+    updateRunningTimerDisplay();
+  }
+
+  function handleProjectClick(projectId) {
+    const now = new Date();
+
+    // 1) Če je kak aktiven timer, ga ustavimo
+    if (currentTimer) {
+      closeEntry(currentTimer.projectId, currentTimer.startTime, now);
+
+      // Če kliknemo isti projekt -> samo ustavimo
+      if (currentTimer.projectId === projectId) {
+        currentTimer = null;
+        stopTimerInterval();
+        renderProjects();
+        updateCurrentRunningInfo();
+        return;
+      }
+    }
+
+    // 2) Začnemo nov timer za kliknjen projekt
+    currentTimer = { projectId, startTime: now };
+    startTimerInterval();
+    renderProjects();
+    updateCurrentRunningInfo();
+  }
+
+  async function closeEntry(projectId, startTime, endTime) {
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
+
+    const diffMs = endTime - startTime;
+    const diffMinutes = diffMs / 60000;
+
+    // Zaokroževanje na najbližjih 15 minut
+    const roundedMinutes = Math.round(diffMinutes / 15) * 15;
+    const hours = Math.floor(roundedMinutes / 60);
+    const minutes = roundedMinutes % 60;
+    const totalFormatted = `${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}`;
+
+    const dateStr = formatDateYMD(startTime);
+    const startStr = formatTimeHM(startTime);
+    const endStr = formatTimeHM(endTime);
+
+    const entry = {
+      client: project.client,
+      project: project.name,
+      date: dateStr,
+      start: startStr,
+      end: endStr,
+      total: totalFormatted,
+    };
+
+    // Dodaj v lokalno tabelo (da takoj vidiš v UI)
+    entries.push(entry);
+    renderEntries();
+
+    // Pošlji v Google Sheet (ne blokira UI, samo logira napako v konzolo, če kaj crkne)
+    if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.startsWith("http")) {
+      try {
+        const formData = new URLSearchParams();
+        formData.append("client", entry.client);
+        formData.append("project", entry.project);
+        formData.append("date", entry.date);
+        formData.append("start", entry.start);
+        formData.append("end", entry.end);
+        formData.append("total", entry.total);
+
+        await fetch(GOOGLE_SCRIPT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+          },
+          body: formData.toString(),
+        });
+      } catch (err) {
+        console.error("Napaka pri pošiljanju v Google Sheet:", err);
+      }
+    }
+  }
+
+  function formatDateYMD(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function formatTimeHM(date) {
+    const h = String(date.getHours()).padStart(2, "0");
+    const m = String(date.getMinutes()).padStart(2, "0");
+    return `${h}:${m}`;
+  }
+
+  function renderEntries() {
+    entriesTableBody.innerHTML = "";
+    entries.forEach((e) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${e.client}</td>
+        <td>${e.project}</td>
+        <td>${e.date}</td>
+        <td>${e.start}</td>
+        <td>${e.end}</td>
+        <td>${e.total}</td>
+      `;
+      entriesTableBody.appendChild(tr);
+    });
+
+    entriesCountBadge.textContent = `${entries.length} vnosov`;
+    downloadCsvBtn.disabled = entries.length === 0;
+  }
+
+  // Timer prikaz
+  function startTimerInterval() {
+    stopTimerInterval();
+    timerInterval = setInterval(updateRunningTimerDisplay, 1000);
+  }
+
+  function stopTimerInterval() {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+  }
+
+  function updateRunningTimerDisplay() {
+    if (!currentTimer) {
+      currentRunningInfo.innerHTML = `<span class="label">Trenutni timer</span><span>-</span>`;
+      return;
+    }
+
+    const now = new Date();
+    const diffMs = now - currentTimer.startTime;
+    const diffSeconds = Math.floor(diffMs / 1000);
+    const h = String(Math.floor(diffSeconds / 3600)).padStart(2, "0");
+    const m = String(Math.floor((diffSeconds % 3600) / 60)).padStart(2, "0");
+    const s = String(diffSeconds % 60).padStart(2, "0");
+    const durationStr = `${h}:${m}:${s}`;
+
+    const project = projects.find((p) => p.id === currentTimer.projectId);
+
+    currentRunningInfo.innerHTML = `
+      <span class="label">Trenutni timer</span>
+      <span>${project ? `${project.client} – ${project.name}` : "?"}</span>
+      <span class="running-timer">${durationStr}</span>
+    `;
+
+    const timers = document.querySelectorAll(".running-timer[data-project-id]");
+    timers.forEach((el) => {
+      if (el.getAttribute("data-project-id") === currentTimer.projectId) {
+        el.textContent = durationStr;
+      }
+    });
+  }
+
+  // Export v CSV (Excel-friendly)
+  downloadCsvBtn.addEventListener("click", () => {
+    if (entries.length === 0) return;
+
+    const header = ["Naročnik", "Projekt", "Datum", "Začetek", "Konec", "Seštevek"];
+    let csv = header.join(";") + "\n";
+
+    entries.forEach((e) => {
+      const row = [
+        e.client,
+        e.project,
+        e.date,
+        e.start,
+        e.end,
+        e.total,
+      ].map((v) => `"${v.replace(/"/g, '""')}"`);
+      csv += row.join(";") + "\n";
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "time-tracking.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // začetno stanje
+  renderProjects();
+  renderEntries();
+</script>
+
+</body>
+</html>
